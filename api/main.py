@@ -12,6 +12,12 @@ import time
 import os
 import json
 from pathlib import Path
+import io
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(
@@ -711,6 +717,224 @@ async def get_field_mapping():
     }
 
 
+def detect_file_format(filename: str) -> str:
+    """Detect file format based on file extension."""
+    filename_lower = filename.lower()
+    if filename_lower.endswith(('.json', '.jsonld')):
+        return 'json'
+    elif filename_lower.endswith(('.csv',)):
+        return 'csv'
+    elif filename_lower.endswith(('.xlsx', '.xls')):
+        return 'excel'
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format. Supported formats: .json, .csv, .xlsx, .xls"
+        )
+
+
+def convert_csv_to_case(content: bytes, filename: str) -> Dict[str, Any]:
+    """Convert CSV file to CASE format."""
+    if not PANDAS_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="CSV support requires pandas library. Please install: pip install pandas"
+        )
+    
+    try:
+        # Read CSV into pandas DataFrame
+        df = pd.read_csv(io.BytesIO(content))
+        
+        # Expected CSV columns (flexible - will use what's available):
+        # Required: identifier, title (for CFDocument)
+        # Optional: fullStatement, abbreviatedStatement, etc. (for CFItems)
+        
+        # Check if this is a framework document or items list
+        if 'CFDocument' in df.columns or all(col in df.columns for col in ['identifier', 'title']):
+            # This looks like a framework document row
+            doc_row = df.iloc[0] if len(df) > 0 else {}
+            cf_document = {
+                "identifier": str(doc_row.get('identifier', doc_row.get('CFDocument.identifier', 'framework-001'))),
+                "title": str(doc_row.get('title', doc_row.get('CFDocument.title', 'Untitled Framework')))
+            }
+            
+            # Add optional fields if present
+            for field in ['description', 'language', 'version', 'lastChangeDateTime', 'officialSourceURL']:
+                if field in doc_row and pd.notna(doc_row[field]):
+                    cf_document[field] = str(doc_row[field])
+        else:
+            # Default framework document
+            cf_document = {
+                "identifier": "csv-import-001",
+                "title": filename.replace('.csv', '')
+            }
+        
+        # Convert rows to CFItems
+        cf_items = []
+        for idx, row in df.iterrows():
+            if 'identifier' in row and pd.notna(row.get('identifier')):
+                item = {
+                    "identifier": str(row['identifier'])
+                }
+                
+                # Map common CSV columns to CFItem fields
+                field_mapping = {
+                    'fullStatement': 'fullStatement',
+                    'statement': 'fullStatement',
+                    'abbreviatedStatement': 'abbreviatedStatement',
+                    'label': 'abbreviatedStatement',
+                    'CFItemType': 'CFItemType',
+                    'type': 'CFItemType',
+                    'hierarchyCode': 'hierarchyCode',
+                    'code': 'hierarchyCode',
+                    'description': 'notes',
+                    'notes': 'notes'
+                }
+                
+                for csv_col, case_field in field_mapping.items():
+                    if csv_col in row and pd.notna(row[csv_col]):
+                        item[case_field] = str(row[csv_col])
+                
+                cf_items.append(item)
+        
+        return {
+            "CFDocument": cf_document,
+            "CFItems": cf_items,
+            "CFAssociations": []
+        }
+    except Exception as e:
+        logger.error(f"CSV conversion error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error converting CSV to CASE format: {str(e)}"
+        )
+
+
+def convert_excel_to_case(content: bytes, filename: str) -> Dict[str, Any]:
+    """Convert Excel file to CASE format."""
+    if not PANDAS_AVAILABLE:
+        raise HTTPException(
+            status_code=500,
+            detail="Excel support requires pandas and openpyxl libraries. Please install: pip install pandas openpyxl"
+        )
+    
+    try:
+        # Read Excel file - try to read multiple sheets
+        excel_file = pd.ExcelFile(io.BytesIO(content))
+        
+        # Look for sheets named 'CFDocument', 'CFItems', 'CFAssociations' or use first sheet
+        cf_document_data = None
+        cf_items_data = None
+        cf_associations_data = None
+        
+        for sheet_name in excel_file.sheet_names:
+            df = pd.read_excel(excel_file, sheet_name=sheet_name)
+            
+            if sheet_name.lower() in ['cfdocument', 'document', 'framework']:
+                cf_document_data = df
+            elif sheet_name.lower() in ['cfitems', 'items', 'competencies', 'skills']:
+                cf_items_data = df
+            elif sheet_name.lower() in ['cfassociations', 'associations', 'relationships']:
+                cf_associations_data = df
+        
+        # If no named sheets found, use first sheet for items
+        if cf_items_data is None and len(excel_file.sheet_names) > 0:
+            cf_items_data = pd.read_excel(excel_file, sheet_name=excel_file.sheet_names[0])
+        
+        # Build CFDocument
+        if cf_document_data is not None and len(cf_document_data) > 0:
+            doc_row = cf_document_data.iloc[0]
+            cf_document = {
+                "identifier": str(doc_row.get('identifier', 'excel-import-001')),
+                "title": str(doc_row.get('title', filename.replace('.xlsx', '').replace('.xls', '')))
+            }
+            
+            for field in ['description', 'language', 'version', 'lastChangeDateTime', 'officialSourceURL']:
+                if field in doc_row and pd.notna(doc_row[field]):
+                    cf_document[field] = str(doc_row[field])
+        else:
+            cf_document = {
+                "identifier": "excel-import-001",
+                "title": filename.replace('.xlsx', '').replace('.xls', '')
+            }
+        
+        # Build CFItems
+        cf_items = []
+        if cf_items_data is not None:
+            for idx, row in cf_items_data.iterrows():
+                if 'identifier' in row and pd.notna(row.get('identifier')):
+                    item = {"identifier": str(row['identifier'])}
+                    
+                    field_mapping = {
+                        'fullStatement': 'fullStatement',
+                        'statement': 'fullStatement',
+                        'abbreviatedStatement': 'abbreviatedStatement',
+                        'label': 'abbreviatedStatement',
+                        'CFItemType': 'CFItemType',
+                        'type': 'CFItemType',
+                        'hierarchyCode': 'hierarchyCode',
+                        'code': 'hierarchyCode'
+                    }
+                    
+                    for excel_col, case_field in field_mapping.items():
+                        if excel_col in row and pd.notna(row[excel_col]):
+                            item[case_field] = str(row[excel_col])
+                    
+                    cf_items.append(item)
+        
+        # Build CFAssociations
+        cf_associations = []
+        if cf_associations_data is not None:
+            for idx, row in cf_associations_data.iterrows():
+                if all(col in row for col in ['identifier', 'associationType', 'originNodeURI', 'destinationNodeURI']):
+                    assoc = {
+                        "identifier": str(row['identifier']),
+                        "associationType": str(row['associationType']),
+                        "originNodeURI": {
+                            "identifier": str(row.get('originNodeURI', row.get('originIdentifier', '')))
+                        },
+                        "destinationNodeURI": {
+                            "identifier": str(row.get('destinationNodeURI', row.get('destinationIdentifier', '')))
+                        }
+                    }
+                    cf_associations.append(assoc)
+        
+        return {
+            "CFDocument": cf_document,
+            "CFItems": cf_items,
+            "CFAssociations": cf_associations
+        }
+    except Exception as e:
+        logger.error(f"Excel conversion error: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error converting Excel to CASE format: {str(e)}"
+        )
+
+
+def parse_uploaded_file(content: bytes, filename: str, file_format: Optional[str] = None) -> Dict[str, Any]:
+    """Parse uploaded file and convert to CASE format."""
+    if file_format is None:
+        file_format = detect_file_format(filename)
+    
+    if file_format == 'json':
+        try:
+            return json.loads(content.decode('utf-8'))
+        except json.JSONDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON in file: {str(e)}")
+        except UnicodeDecodeError as e:
+            raise HTTPException(status_code=400, detail=f"File encoding error: {str(e)}")
+    elif file_format == 'csv':
+        return convert_csv_to_case(content, filename)
+    elif file_format == 'excel':
+        return convert_excel_to_case(content, filename)
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format: {file_format}"
+        )
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -835,28 +1059,41 @@ async def translate_case_to_asn(case_input: CASEInput):
 
 @app.post("/translate/upload-file")
 async def translate_uploaded_file(
-    file: UploadFile = File(..., description="CASE JSON file to translate"),
-    target_format: str = Form("ieee_scd", description="Target format: 'ieee_scd' or 'asn_ctdl'")
+    file: UploadFile = File(..., description="Input file to translate (JSON, CSV, or Excel)"),
+    target_format: str = Form("ieee_scd", description="Target format: 'ieee_scd' or 'asn_ctdl'"),
+    input_format: Optional[str] = Form(None, description="Input format override: 'json', 'csv', or 'excel' (auto-detected if not specified)")
 ):
     """
-    Translate a CASE JSON file to IEEE SCD or ASN-CTDL JSON-LD format.
+    Translate an input file to IEEE SCD or ASN-CTDL JSON-LD format.
     
-    Accepts a file upload with CASE JSON content.
+    Accepts multiple file formats:
+    - JSON: CASE 1.1 format (.json)
+    - CSV: Tabular data with columns for competencies (.csv)
+    - Excel: Multi-sheet workbook with CFDocument, CFItems, CFAssociations sheets (.xlsx, .xls)
+    
     Returns a JSON-LD document with @context and @graph containing the translated data.
     """
     try:
-        # Validate file type
-        if not file.filename.endswith(('.json', '.JSON')):
-            raise HTTPException(status_code=400, detail="File must be a JSON file (.json)")
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Filename is required")
         
-        # Read and parse file content
+        # Read file content
         content = await file.read()
+        
+        # Detect or use specified format
+        detected_format = input_format or detect_file_format(file.filename)
+        
+        # Parse file based on format
         try:
-            case_data = json.loads(content.decode('utf-8'))
-        except json.JSONDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"Invalid JSON in file: {str(e)}")
-        except UnicodeDecodeError as e:
-            raise HTTPException(status_code=400, detail=f"File encoding error: {str(e)}")
+            case_data = parse_uploaded_file(content, file.filename, detected_format)
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"File parsing error: {str(e)}", exc_info=True)
+            raise HTTPException(
+                status_code=400,
+                detail=f"Error parsing {detected_format.upper()} file: {str(e)}"
+            )
         
         # Validate target format
         if target_format not in ["ieee_scd", "asn_ctdl"]:
@@ -866,7 +1103,10 @@ async def translate_uploaded_file(
         try:
             case_input = CASEInput(**case_data)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid CASE document structure: {str(e)}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid CASE document structure after conversion: {str(e)}. Please check your input file format."
+            )
         
         # Translate
         result = translate_case_document(case_input, target_format)
