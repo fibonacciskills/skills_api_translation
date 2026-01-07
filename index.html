@@ -504,9 +504,10 @@
         let currentTargetFormat = 'ieee_scd';
         
         function getApiUrl() {
+            // Use relative URLs for production deployment
             return currentTargetFormat === 'asn_ctdl' 
-                ? 'http://localhost:8000/translate/case-to-asn'
-                : 'http://localhost:8000/translate/case-to-ieee';
+                ? '/translate/case-to-asn'
+                : '/translate/case-to-ieee';
         }
         
         function updateOutputTitle() {
@@ -826,8 +827,8 @@
                 }
             } catch (e) {
                 // Handle network or other errors
-                const errorMsg = `Connection Error:\n\n${e.message}\n\nMake sure the API server is running at http://localhost:8000`;
-                updateOutput('Error: ' + e.message + '\n\nMake sure the API server is running at http://localhost:8000', true);
+                const errorMsg = `Connection Error:\n\n${e.message}`;
+                updateOutput('Error: ' + e.message, true);
                 showError(errorMsg);
                 updateStatus(0, 'Connection Error');
                 updateProgressStep(2, 'error');
@@ -892,7 +893,7 @@
                 updateProgressStep(1, 'completed');
                 updateProgressStep(2, 'active');
 
-                const response = await fetch('http://localhost:8000/translate/upload-file', {
+                const response = await fetch('/translate/upload-file', {
                     method: 'POST',
                     body: formData
                 });
@@ -930,8 +931,8 @@
                     updateProgressStep(3, 'error');
                 }
             } catch (e) {
-                const errorMsg = `Upload Error:\n\n${e.message}\n\nMake sure the API server is running at http://localhost:8000`;
-                updateOutput('Error: ' + e.message + '\n\nMake sure the API server is running at http://localhost:8000', true);
+                const errorMsg = `Upload Error:\n\n${e.message}`;
+                updateOutput('Error: ' + e.message, true);
                 showError(errorMsg);
                 updateStatus(0, 'Upload Error');
                 updateProgressStep(2, 'error');
