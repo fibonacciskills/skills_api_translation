@@ -1,0 +1,69 @@
+{
+  "CFDocument": {
+    "identifier": "framework-001",
+    "uri": "http://example.org/frameworks/framework-001",
+    "title": "Example Competency Framework",
+    "description": "A sample competency framework for demonstration",
+    "language": "en-US",
+    "adoptionStatus": "Published",
+    "version": "1.0.0",
+    "lastChangeDateTime": "2024-01-15T10:00:00Z",
+    "publisher": {
+      "identifier": "org-001",
+      "uri": "http://example.org/organizations/org-001",
+      "name": "Example Organization"
+    },
+    "officialSourceURL": "http://example.org/frameworks/framework-001"
+  },
+  "CFItems": [
+    {
+      "identifier": "skill-001",
+      "uri": "http://example.org/skills/skill-001",
+      "fullStatement": "Students will be able to analyze complex problems",
+      "abbreviatedStatement": "Analyze problems",
+      "CFItemType": "Competency",
+      "hierarchyCode": "1.1",
+      "language": "en-US"
+    },
+    {
+      "identifier": "skill-002",
+      "uri": "http://example.org/skills/skill-002",
+      "fullStatement": "Students will be able to design solutions",
+      "abbreviatedStatement": "Design solutions",
+      "CFItemType": "Competency",
+      "hierarchyCode": "1.2",
+      "language": "en-US"
+    }
+  ],
+  "CFAssociations": [
+    {
+      "identifier": "assoc-001",
+      "uri": "http://example.org/associations/assoc-001",
+      "associationType": "isChildOf",
+      "originNodeURI": {
+        "identifier": "skill-002",
+        "uri": "http://example.org/skills/skill-002"
+      },
+      "destinationNodeURI": {
+        "identifier": "skill-001",
+        "uri": "http://example.org/skills/skill-001"
+      },
+      "sequenceNumber": 1
+    },
+    {
+      "identifier": "assoc-002",
+      "uri": "http://example.org/associations/assoc-002",
+      "associationType": "precedes",
+      "originNodeURI": {
+        "identifier": "skill-001",
+        "uri": "http://example.org/skills/skill-001"
+      },
+      "destinationNodeURI": {
+        "identifier": "skill-002",
+        "uri": "http://example.org/skills/skill-002"
+      },
+      "sequenceNumber": 1
+    }
+  ]
+}
+
