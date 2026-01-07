@@ -1,0 +1,46 @@
+Entity Type,CASE 1.1 Field,IEEE SCD Field,ASN-CTDL Field,Mapped,Notes
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,identifier,@id,ceasn:identifier (@id),Yes,Used to generate @id IRI (same in both formats)
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,uri,@id,@id,Yes,Used as @id IRI if provided (same in both formats)
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,title,scd:name,ceasn:name,Yes,"Direct mapping (same concept, different namespace)"
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,description,scd:description,ceasn:description,Yes,Direct mapping (same in both formats)
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,language,scd:language,ceasn:inLanguage,Yes,IEEE SCD: language; ASN-CTDL: inLanguage
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,version,scd:version,,Yes,IEEE SCD: version; ASN-CTDL: No direct equivalent
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,lastChangeDateTime,scd:dateModified,ceasn:dateModified,Yes,Direct mapping (same in both formats)
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,publisher,scd:publisher,ceasn:publisher,Yes,"Direct mapping (object preserved as-is, same in both)"
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,officialSourceURL,scd:url,ceasn:source,Yes,IEEE SCD: url; ASN-CTDL: source
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,adoptionStatus,,ceasn:publicationStatusType,No,IEEE SCD: No equivalent; ASN-CTDL: publicationStatusType
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,educationLevel,,ceasn:educationLevelType,No,IEEE SCD: No equivalent at framework level; ASN-CTDL: educationLevelType
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,subject,,ceasn:localSubject,No,IEEE SCD: No equivalent; ASN-CTDL: localSubject
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,rights,,ceasn:rights,No,IEEE SCD: No equivalent; ASN-CTDL: rights
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,license,,ceasn:license,No,IEEE SCD: No equivalent; ASN-CTDL: license
+CFDocument → scd:CompetencyFramework / ceasn:CompetencyFramework,notes,,ceasn:comment,No,IEEE SCD: No equivalent; ASN-CTDL: comment
+CFItem → scd:CompetencyDefinition / ceasn:Competency,identifier,@id,,Yes,Used to generate @id IRI
+CFItem → scd:CompetencyDefinition / ceasn:Competency,uri,@id,,Yes,Used as @id IRI if provided
+CFItem → scd:CompetencyDefinition / ceasn:Competency,fullStatement,scd:statement,ceasn:competencyText,Yes,IEEE SCD: statement; ASN-CTDL: competencyText
+CFItem → scd:CompetencyDefinition / ceasn:Competency,abbreviatedStatement,scd:abbreviatedStatement,ceasn:competencyLabel,Yes,IEEE SCD: abbreviatedStatement; ASN-CTDL: competencyLabel
+CFItem → scd:CompetencyDefinition / ceasn:Competency,alternativeLabel,scd:alternativeLabel,skos:altLabel,Yes,IEEE SCD: alternativeLabel; ASN-CTDL: skos:altLabel
+CFItem → scd:CompetencyDefinition / ceasn:Competency,conceptKeywords,scd:conceptKeyword,ceasn:conceptKeyword,Yes,"Direct mapping (same in both formats, array)"
+CFItem → scd:CompetencyDefinition / ceasn:Competency,hierarchyCode,scd:hierarchyCode,ceasn:codedNotation,Yes,IEEE SCD: hierarchyCode; ASN-CTDL: codedNotation
+CFItem → scd:CompetencyDefinition / ceasn:Competency,humanCodingScheme,scd:humanCodingScheme,ceasn:codedNotation,Yes,IEEE SCD: humanCodingScheme; ASN-CTDL: codedNotation (or altCodedNotation)
+CFItem → scd:CompetencyDefinition / ceasn:Competency,CFItemType,scd:competencyCategory,ceasn:competencyCategory,Yes,Direct mapping (same in both formats)
+CFItem → scd:CompetencyDefinition / ceasn:Competency,language,scd:language,ceasn:inLanguage,Yes,IEEE SCD: language; ASN-CTDL: inLanguage
+CFItem → scd:CompetencyDefinition / ceasn:Competency,educationLevel,scd:educationLevel,ceasn:educationLevelType,Yes,IEEE SCD: educationLevel; ASN-CTDL: educationLevelType (expects skos:Concept)
+CFItem → scd:CompetencyDefinition / ceasn:Competency,conceptKeywordsUri,,ceasn:conceptTerm,No,IEEE SCD: No equivalent; ASN-CTDL: conceptTerm (skos:Concept)
+CFItem → scd:CompetencyDefinition / ceasn:Competency,notes,,ceasn:comment,No,IEEE SCD: No equivalent; ASN-CTDL: comment
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,identifier,@id,,Yes,Used to generate @id IRI
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,uri,@id,,Yes,Used as @id IRI if provided
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,associationType (isChildOf),scd:relationType = hasPart,ceasn:isChildOf (property on Competency),Yes,IEEE SCD: hasPart (separate ResourceAssociation); ASN-CTDL: isChildOf (direct property)
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,associationType (precedes),scd:relationType = precedes,ceasn:prerequisiteAlignment,Yes,IEEE SCD: precedes; ASN-CTDL: prerequisiteAlignment
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,associationType (hasSkillLevel),scd:relationType = competencyLevel,asn:hasProgressionLevel,Yes,IEEE SCD: competencyLevel; ASN-CTDL: hasProgressionLevel (references progression model)
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,associationType (other),scd:relationType,"Various alignment properties (alignTo, alignFrom, etc.)",Yes,IEEE SCD: Unmapped types pass through; ASN-CTDL: Various alignment properties available
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,originNodeURI,scd:sourceNode.@id,Property on origin Competency,Yes,IEEE SCD: sourceNode in ResourceAssociation; ASN-CTDL: Direct property on Competency
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,destinationNodeURI,scd:targetNode.@id,Value of property on origin Competency,Yes,IEEE SCD: targetNode in ResourceAssociation; ASN-CTDL: Value of relationship property
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,sequenceNumber,scd:sequenceNumber,ceasn:listID,Yes,IEEE SCD: sequenceNumber; ASN-CTDL: listID (alphanumeric position)
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,lastChangeDateTime,scd:dateModified,ceasn:dateModified,Yes,Direct mapping (same in both formats)
+CFAssociation → scd:ResourceAssociation / ceasn:Competency Properties,CFDocumentURI,,ceasn:isPartOf,No,IEEE SCD: No equivalent; ASN-CTDL: isPartOf (framework reference)
+Format-Specific Fields (Added by Translator),,@type,@type,No,"Both formats add @type: SCD (scd:CompetencyFramework, scd:CompetencyDefinition, scd:ResourceAssociation); ASN (ceasn:CompetencyFramework, ceasn:Competency)"
+Format-Specific Fields (Added by Translator),,@context,@context,No,Both formats add @context: SCD uses scd namespace; ASN uses ceasn and skos namespaces
+Format-Specific Fields (Added by Translator),,@graph,@graph,No,Both formats use @graph to contain all translated entities
+Format-Specific Fields (Added by Translator),,scd:ResourceAssociation,,No,IEEE SCD: Separate association objects; ASN-CTDL: Relationships are direct properties on Competency
+Format-Specific Fields (Added by Translator),,,ceasn:hasChild,No,"ASN-CTDL only: Inverse of isChildOf, indicates child competencies"
+Format-Specific Fields (Added by Translator),,,ceasn:alignTo / ceasn:alignFrom,No,ASN-CTDL only: Alignment properties for equivalency assertions
