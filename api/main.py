@@ -2,10 +2,11 @@
 FastAPI service to translate 1EdTech CASE JSON to IEEE SCD JSON-LD.
 """
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
+import re
 import uuid
 import logging
 import time
@@ -106,6 +107,22 @@ ASSOCIATION_TYPE_MAP_ASN = {
     "isChildOf": "isChildOf",  # Direct mapping!
     "precedes": "prerequisiteAlignment",  # ASN uses alignment property
     "hasSkillLevel": None  # May need special handling
+}
+
+# Profile URIs for Accept/Content-Type headers
+PROFILE_URI_IEEE_SCD = "https://w3id.org/skill-credential/"
+PROFILE_URI_ASN_CTDL = "https://purl.org/ctdlasn/terms/"
+
+# Map profile URIs to target formats
+PROFILE_TO_FORMAT = {
+    PROFILE_URI_IEEE_SCD: "ieee_scd",
+    PROFILE_URI_ASN_CTDL: "asn_ctdl"
+}
+
+# Map target formats to profile URIs (reverse lookup)
+FORMAT_TO_PROFILE = {
+    "ieee_scd": PROFILE_URI_IEEE_SCD,
+    "asn_ctdl": PROFILE_URI_ASN_CTDL
 }
 
 
@@ -935,6 +952,54 @@ def parse_uploaded_file(content: bytes, filename: str, file_format: Optional[str
         )
 
 
+def parse_accept_header(accept_header: Optional[str]) -> tuple:
+    """
+    Parse Accept header to extract target format and profile URI.
+    
+    Expected format: application/ld+json; profile="[URI]"
+    
+    Returns:
+        tuple: (target_format, profile_uri)
+    """
+    if not accept_header:
+        # Default to IEEE SCD if no Accept header
+        return "ieee_scd", PROFILE_URI_IEEE_SCD
+    
+    # Parse Accept header for profile parameter
+    # Pattern: application/ld+json; profile="URI"
+    profile_pattern = r'profile="([^"]+)"'
+    match = re.search(profile_pattern, accept_header)
+    
+    if match:
+        profile_uri = match.group(1)
+        # Normalize URI (remove trailing slash if present)
+        profile_uri = profile_uri.rstrip('/')
+        
+        # Check if we support this profile
+        if profile_uri in PROFILE_TO_FORMAT:
+            target_format = PROFILE_TO_FORMAT[profile_uri]
+            return target_format, profile_uri
+        else:
+            # Try with trailing slash
+            profile_uri_with_slash = profile_uri + '/'
+            if profile_uri_with_slash in PROFILE_TO_FORMAT:
+                target_format = PROFILE_TO_FORMAT[profile_uri_with_slash]
+                return target_format, profile_uri_with_slash
+    
+    # If no profile found but Accept header contains application/ld+json, default to IEEE SCD
+    if 'application/ld+json' in accept_header.lower():
+        return "ieee_scd", PROFILE_URI_IEEE_SCD
+    
+    # Default fallback
+    return "ieee_scd", PROFILE_URI_IEEE_SCD
+
+
+def get_content_type_header(target_format: str) -> str:
+    """Generate Content-Type header with profile for response."""
+    profile_uri = FORMAT_TO_PROFILE.get(target_format, PROFILE_URI_IEEE_SCD)
+    return f'application/ld+json; profile="{profile_uri}"'
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -1027,16 +1092,61 @@ def translate_case_document(case_input: CASEInput, target_format: str = "ieee_sc
     return result
 
 
+@app.post("/translate")
+async def translate_case(
+    case_input: CASEInput,
+    request: Request,
+    accept: Optional[str] = Header(None, alias="Accept")
+):
+    """
+    Translate a CASE JSON document to IEEE SCD or ASN-CTDL JSON-LD format.
+    
+    Uses HTTP Accept header to determine output format:
+    - Accept: application/ld+json; profile="https://w3id.org/skill-credential/" for IEEE SCD
+    - Accept: application/ld+json; profile="https://purl.org/ctdlasn/terms/" for ASN-CTDL
+    
+    If no Accept header is provided, defaults to IEEE SCD.
+    
+    Accepts a full CASE document with CFDocument, CFItems, and CFAssociations.
+    Returns a JSON-LD document with @context and @graph containing the translated data.
+    Content-Type header includes the profile URI of the returned format.
+    """
+    try:
+        # Parse Accept header to determine target format
+        target_format, profile_uri = parse_accept_header(accept)
+        
+        # Translate the document
+        result = translate_case_document(case_input, target_format)
+        
+        # Create response with appropriate Content-Type header
+        content_type = get_content_type_header(target_format)
+        return JSONResponse(
+            content=result,
+            headers={"Content-Type": content_type}
+        )
+    except Exception as e:
+        logger.error(f"Translation failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=400, detail=f"Translation error: {str(e)}")
+
+
 @app.post("/translate/case-to-ieee")
 async def translate_case_to_ieee(case_input: CASEInput):
     """
     Translate a CASE JSON document to IEEE SCD JSON-LD format.
     
+    DEPRECATED: Use POST /translate with Accept header instead.
+    This endpoint is maintained for backward compatibility.
+    
     Accepts a full CASE document with CFDocument, CFItems, and CFAssociations.
     Returns a JSON-LD document with @context and @graph containing the translated data.
     """
     try:
-        return translate_case_document(case_input, "ieee_scd")
+        result = translate_case_document(case_input, "ieee_scd")
+        content_type = get_content_type_header("ieee_scd")
+        return JSONResponse(
+            content=result,
+            headers={"Content-Type": content_type}
+        )
     except Exception as e:
         logger.error(f"Translation failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Translation error: {str(e)}")
@@ -1047,11 +1157,19 @@ async def translate_case_to_asn(case_input: CASEInput):
     """
     Translate a CASE JSON document to ASN-CTDL JSON-LD format.
     
+    DEPRECATED: Use POST /translate with Accept header instead.
+    This endpoint is maintained for backward compatibility.
+    
     Accepts a full CASE document with CFDocument, CFItems, and CFAssociations.
     Returns a JSON-LD document with @context and @graph containing the translated data.
     """
     try:
-        return translate_case_document(case_input, "asn_ctdl")
+        result = translate_case_document(case_input, "asn_ctdl")
+        content_type = get_content_type_header("asn_ctdl")
+        return JSONResponse(
+            content=result,
+            headers={"Content-Type": content_type}
+        )
     except Exception as e:
         logger.error(f"Translation failed: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Translation error: {str(e)}")
@@ -1060,11 +1178,20 @@ async def translate_case_to_asn(case_input: CASEInput):
 @app.post("/translate/upload-file")
 async def translate_uploaded_file(
     file: UploadFile = File(..., description="Input file to translate (JSON, CSV, or Excel)"),
-    target_format: str = Form("ieee_scd", description="Target format: 'ieee_scd' or 'asn_ctdl'"),
-    input_format: Optional[str] = Form(None, description="Input format override: 'json', 'csv', or 'excel' (auto-detected if not specified)")
+    target_format: Optional[str] = Form(None, description="Target format: 'ieee_scd' or 'asn_ctdl' (deprecated: use Accept header)"),
+    input_format: Optional[str] = Form(None, description="Input format override: 'json', 'csv', or 'excel' (auto-detected if not specified)"),
+    request: Request = None,
+    accept: Optional[str] = Header(None, alias="Accept")
 ):
     """
     Translate an input file to IEEE SCD or ASN-CTDL JSON-LD format.
+    
+    Uses HTTP Accept header to determine output format (preferred):
+    - Accept: application/ld+json; profile="https://w3id.org/skill-credential/" for IEEE SCD
+    - Accept: application/ld+json; profile="https://purl.org/ctdlasn/terms/" for ASN-CTDL
+    
+    If no Accept header is provided, uses target_format form parameter (backward compatibility).
+    If neither is provided, defaults to IEEE SCD.
     
     Accepts multiple file formats:
     - JSON: CASE 1.1 format (.json)
@@ -1072,6 +1199,7 @@ async def translate_uploaded_file(
     - Excel: Multi-sheet workbook with CFDocument, CFItems, CFAssociations sheets (.xlsx, .xls)
     
     Returns a JSON-LD document with @context and @graph containing the translated data.
+    Content-Type header includes the profile URI of the returned format.
     """
     try:
         if not file.filename:
@@ -1095,9 +1223,14 @@ async def translate_uploaded_file(
                 detail=f"Error parsing {detected_format.upper()} file: {str(e)}"
             )
         
-        # Validate target format
-        if target_format not in ["ieee_scd", "asn_ctdl"]:
-            raise HTTPException(status_code=400, detail="target_format must be 'ieee_scd' or 'asn_ctdl'")
+        # Determine target format from Accept header or form parameter
+        if target_format:
+            # Use form parameter if provided (backward compatibility)
+            if target_format not in ["ieee_scd", "asn_ctdl"]:
+                raise HTTPException(status_code=400, detail="target_format must be 'ieee_scd' or 'asn_ctdl'")
+        else:
+            # Parse Accept header to determine target format
+            target_format, profile_uri = parse_accept_header(accept)
         
         # Parse as CASEInput
         try:
@@ -1111,8 +1244,12 @@ async def translate_uploaded_file(
         # Translate
         result = translate_case_document(case_input, target_format)
         
-        # Return result
-        return JSONResponse(content=result)
+        # Create response with appropriate Content-Type header
+        content_type = get_content_type_header(target_format)
+        return JSONResponse(
+            content=result,
+            headers={"Content-Type": content_type}
+        )
     
     except HTTPException:
         raise
