@@ -111,7 +111,7 @@ ASSOCIATION_TYPE_MAP_ASN = {
 
 # Profile URIs for Accept/Content-Type headers
 PROFILE_URI_IEEE_SCD = "https://w3id.org/skill-credential/"
-PROFILE_URI_ASN_CTDL = "https://purl.org/ctdlasn/terms/"
+
 
 # Map profile URIs to target formats
 PROFILE_TO_FORMAT = {
