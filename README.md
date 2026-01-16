@@ -89,7 +89,29 @@ Expected response:
 
 ### Example Requests
 
-#### 1. Translate to IEEE SCD (JSON body)
+#### 1. Translate using Accept Header (Recommended)
+
+The API uses HTTP content negotiation with Accept headers to specify the desired output format:
+
+**IEEE SCD:**
+```bash
+curl -X POST "http://localhost:8000/translate" \
+  -H "Content-Type: application/json" \
+  -H 'Accept: application/ld+json; profile="https://opensource.ieee.org/scd/scd/-/blob/main/resources/context.jsonld"' \
+  -d @example_case.json
+```
+
+**ASN-CTDL:**
+```bash
+curl -X POST "http://localhost:8000/translate" \
+  -H "Content-Type: application/json" \
+  -H 'Accept: application/ld+json; profile="https://purl.org/ctdlasn/terms/"' \
+  -d @example_case.json
+```
+
+The API returns `Content-Type` header with the same profile URI to indicate the format of the response.
+
+#### 2. Translate to IEEE SCD (JSON body - Legacy endpoint)
 
 ```bash
 curl -X POST "http://localhost:8000/translate/case-to-ieee" \
@@ -105,7 +127,7 @@ curl -X POST "http://localhost:8000/translate/case-to-ieee" \
   -o output_ieee_scd.json
 ```
 
-#### 2. Translate to ASN-CTDL (JSON body)
+#### 3. Translate to ASN-CTDL (JSON body - Legacy endpoint)
 
 ```bash
 curl -X POST "http://localhost:8000/translate/case-to-asn" \
@@ -121,23 +143,36 @@ curl -X POST "http://localhost:8000/translate/case-to-asn" \
   -o output_asn_ctdl.json
 ```
 
-#### 3. File Upload to IEEE SCD
+#### 4. File Upload (supports Accept header or target_format parameter)
 
+**Using Accept Header (Recommended):**
+```bash
+curl -X POST "http://localhost:8000/translate/upload-file" \
+  -H 'Accept: application/ld+json; profile="https://opensource.ieee.org/scd/scd/-/blob/main/resources/context.jsonld"' \
+  -F "file=@example_case.json"
+```
+
+**Using target_format parameter (Legacy):**
 ```bash
 curl -X POST "http://localhost:8000/translate/upload-file" \
   -F "file=@example_case.json" \
   -F "target_format=ieee_scd"
 ```
 
+The file upload endpoint supports multiple formats:
+- **JSON**: CASE 1.1 format (.json)
+- **CSV**: Tabular data with competency columns (.csv)
+- **Excel**: Multi-sheet workbook (.xlsx, .xls)
+
 Save output to file:
 ```bash
 curl -X POST "http://localhost:8000/translate/upload-file" \
+  -H 'Accept: application/ld+json; profile="https://opensource.ieee.org/scd/scd/-/blob/main/resources/context.jsonld"' \
   -F "file=@example_case.json" \
-  -F "target_format=ieee_scd" \
   -o output_ieee_scd.json
 ```
 
-#### 4. File Upload to ASN-CTDL
+#### 5. File Upload to ASN-CTDL
 
 ```bash
 curl -X POST "http://localhost:8000/translate/upload-file" \
@@ -153,7 +188,7 @@ curl -X POST "http://localhost:8000/translate/upload-file" \
   -o output_asn_ctdl.json
 ```
 
-#### 5. View Field Mappings
+#### 6. View Field Mappings
 
 Get the complete field mapping reference:
 ```bash
