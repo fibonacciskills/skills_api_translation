@@ -37,10 +37,12 @@ The service will be available at `http://localhost:8000`
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
 - Translate endpoints:
-  - `POST /translate/case-to-ieee` (IEEE SCD output, JSON body)
-  - `POST /translate/case-to-asn` (ASN-CTDL output, JSON body)
-  - `POST /translate/upload-file` (File upload endpoint, accepts .json file)
+  - `POST /translate` (Unified endpoint using HTTP Accept header for format selection)
+  - `POST /translate/case-to-ieee` (IEEE SCD output, JSON body - deprecated, use `/translate` with Accept header)
+  - `POST /translate/case-to-asn` (ASN-CTDL output, JSON body - deprecated, use `/translate` with Accept header)
+  - `POST /translate/upload-file` (File upload endpoint, accepts .json, .csv, .xlsx, .xls files)
 - Field mapping: `GET /field-mapping` (JSON endpoint with 3-way comparison)
+- Field mapping CSV: `field_mapping.csv` (static CSV file viewable in GitHub)
 
 ## Web UI
 
@@ -218,6 +220,62 @@ These provide interactive forms to test the API directly in your browser.
 ## Example CASE JSON
 
 See `example_case.json` for a sample CASE document structure.
+
+## How the Translation API Works
+
+The translation API uses **static table mapping** - a deterministic, rule-based approach with hardcoded field mappings and translation functions. This is not machine learning or dynamic lookup; it's a straightforward one-to-one field mapping system.
+
+### Translation Architecture
+
+The translation process works in three stages:
+
+1. **Entity Translation**: Each CASE entity type maps to a specific target entity type
+   - `CFDocument` → `scd:CompetencyFramework` (IEEE SCD) or `ceasn:CompetencyFramework` (ASN-CTDL)
+   - `CFItem` → `scd:CompetencyDefinition` (IEEE SCD) or `ceasn:Competency` (ASN-CTDL)
+   - `CFAssociation` → `scd:ResourceAssociation` (IEEE SCD) or direct properties on competencies (ASN-CTDL)
+
+2. **Field Mapping**: Each source field maps directly to a target field using hardcoded mappings
+   - Example: `title` → `scd:name` (IEEE SCD) or `ceasn:name` (ASN-CTDL)
+   - Example: `fullStatement` → `scd:statement` (IEEE SCD) or `ceasn:competencyText` (ASN-CTDL)
+   - See `field_mapping.csv` or `/field-mapping` endpoint for complete mappings
+
+3. **Association Type Mapping**: CASE association types map to target relationship types using static dictionaries:
+   ```python
+   # IEEE SCD mappings
+   "isChildOf" → "hasPart"
+   "precedes" → "precedes"
+   "hasSkillLevel" → "competencyLevel"
+   
+   # ASN-CTDL mappings
+   "isChildOf" → "ceasn:isChildOf" (direct property)
+   "precedes" → "ceasn:prerequisiteAlignment"
+   ```
+
+### Translation Process Flow
+
+1. **Parse Input**: CASE JSON is parsed and validated using Pydantic models
+2. **Entity Translation**: Each entity (CFDocument, CFItem, CFAssociation) is translated using format-specific functions
+3. **Field Mapping**: Source fields are conditionally mapped to target fields (only if present in source)
+4. **IRI Generation**: Identifiers are converted to `@id` IRIs (using provided URI or generating from identifier)
+5. **Graph Assembly**: All translated entities are assembled into a `@graph` array
+6. **Context Addition**: Format-specific `@context` is added with appropriate namespace URIs
+7. **Response**: JSON-LD document is returned with appropriate `Content-Type` header including profile URI
+
+### Key Characteristics
+
+- **Deterministic**: Same input always produces same output
+- **Static Mappings**: All field mappings are hardcoded in translation functions
+- **Conditional**: Fields are only included if present in source (no defaults)
+- **Preserves Structure**: Identifiers, relationships, and data types are preserved
+- **Format-Specific**: Different logic for IEEE SCD vs ASN-CTDL (e.g., associations handled differently)
+
+### Mapping Tables
+
+The complete field mappings are available in two formats:
+- **CSV**: `field_mapping.csv` (viewable in GitHub)
+- **JSON**: `GET /field-mapping` API endpoint
+
+These show every CASE field, its mapping to IEEE SCD and ASN-CTDL, whether it's mapped, and notes about the mapping.
 
 ## Translation Rules
 
