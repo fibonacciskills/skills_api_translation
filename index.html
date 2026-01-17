@@ -504,10 +504,16 @@
         let currentTargetFormat = 'ieee_scd';
         
         function getApiUrl() {
-            // Use relative URLs for production deployment
-            return currentTargetFormat === 'asn_ctdl' 
-                ? '/translate/case-to-asn'
-                : '/translate/case-to-ieee';
+            // Use the new unified /translate endpoint
+            return '/translate';
+        }
+        
+        function getAcceptHeader() {
+            // Return Accept header with profile URI based on target format
+            const profileUri = currentTargetFormat === 'asn_ctdl'
+                ? 'https://purl.org/ctdlasn/terms/'
+                : 'https://w3id.org/skill-credential/';
+            return `application/ld+json; profile="${profileUri}"`;
         }
         
         function updateOutputTitle() {
@@ -792,6 +798,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': getAcceptHeader()
                     },
                     body: JSON.stringify(caseData)
                 });
@@ -897,6 +904,9 @@
 
                 const response = await fetch('/translate/upload-file', {
                     method: 'POST',
+                    headers: {
+                        'Accept': getAcceptHeader()
+                    },
                     body: formData
                 });
 
