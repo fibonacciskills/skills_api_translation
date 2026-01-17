@@ -184,8 +184,8 @@ curl -X POST "http://localhost:8000/translate/upload-file" \
 ### Testing Output Format
 
 The API returns valid JSON-LD that can be directly uploaded to systems expecting:
-- **IEEE SCD format**: Systems using the Skill Credential vocabulary
-- **ASN-CTDL format**: Systems using the CASE/ASN vocabulary
+- **IEEE SCD format**: Systems using the Shareable Competency Definition vocabulary
+- **ASN-CTDL format**: Systems using the ASN vocabulary
 
 Output structure:
 ```json
