@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 import re
+import re
 import uuid
 import logging
 import time
@@ -950,6 +951,53 @@ def parse_uploaded_file(content: bytes, filename: str, file_format: Optional[str
             status_code=400,
             detail=f"Unsupported file format: {file_format}"
         )
+
+
+def parse_accept_header(accept_header: Optional[str]) -> tuple:
+    """
+    Parse Accept header to extract target format and profile URI.
+    
+    Expected format: application/ld+json; profile="[URI]"
+    
+    Returns:
+        tuple: (target_format, profile_uri)
+    """
+    if not accept_header:
+        # Default to IEEE SCD if no Accept header
+        return "ieee_scd", PROFILE_URI_IEEE_SCD
+    
+    # Parse Accept header for profile parameter
+    # Pattern: application/ld+json; profile="URI"
+    profile_pattern = r'profile="([^"]+)"'
+    match = re.search(profile_pattern, accept_header)
+    
+    if match:
+        profile_uri = match.group(1)
+        
+        # Check if we support this profile (exact match first)
+        if profile_uri in PROFILE_TO_FORMAT:
+            target_format = PROFILE_TO_FORMAT[profile_uri]
+            return target_format, profile_uri
+        
+        # Try normalized versions (with/without trailing content)
+        # Handle GitHub blob URLs - extract base URL
+        if 'opensource.ieee.org/scd/scd' in profile_uri:
+            return "ieee_scd", PROFILE_URI_IEEE_SCD
+        if 'purl.org/ctdlasn/terms' in profile_uri:
+            return "asn_ctdl", PROFILE_URI_ASN_CTDL
+    
+    # If no profile found but Accept header contains application/ld+json, default to IEEE SCD
+    if 'application/ld+json' in accept_header.lower():
+        return "ieee_scd", PROFILE_URI_IEEE_SCD
+    
+    # Default fallback
+    return "ieee_scd", PROFILE_URI_IEEE_SCD
+
+
+def get_content_type_header(target_format: str) -> str:
+    """Generate Content-Type header with profile for response."""
+    profile_uri = FORMAT_TO_PROFILE.get(target_format, PROFILE_URI_IEEE_SCD)
+    return f'application/ld+json; profile="{profile_uri}"'
 
 
 @app.get("/health")
