@@ -4,7 +4,8 @@ A minimal FastAPI service that translates 1EdTech CASE 1.1 JSON documents to:
 - **IEEE SCD** JSON-LD format
 - **ASN-CTDL** JSON-LD format
 
-![Uploading Screenshot 2026-07-06 at 11.06.04 AM.png…]()
+<img width="1467" height="600" alt="Screenshot 2026-07-06 at 11 06 04 AM" src="https://github.com/user-attachments/assets/2cef6145-6929-485f-ba36-54bf7645eea3" />
+
 
 
 ## Setup
